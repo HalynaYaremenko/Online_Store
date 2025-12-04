@@ -32,7 +32,7 @@ CREATE TABLE order_items (
   REFERENCES products_new(id) ON DELETE CASCADE,
   quantity INTEGER CHECK (quantity > 0),
   PRIMARY KEY (order_id, product_id)
-
+)
 
 -- Заповніть їх тестовими даними (мінімум 5 товарів, 3 клієнти, 3 замовлення).
 
@@ -128,3 +128,14 @@ VALUES
 COMMIT;
 
 -- Створіть view, яке показує кількість замовлень і витрати клієнтів.
+
+CREATE VIEW customer_order_count_price AS (
+   SELECT c.name, 
+          COUNT(o.id) AS orders_count,
+          SUM(oi.quantity * p.price) AS order_total
+   FROM customers c
+   JOIN orders o ON o.customer_id = c.id
+   JOIN order_items oi ON oi.order_id = o.id
+   JOIN products_new p ON p.id = oi.product_id
+   GROUP BY c.id, c.name
+  );
