@@ -17,6 +17,7 @@ CREATE TABLE customers (
 );
 
 -- таблиця замовлень
+-- ON DELETE CASCADE гарантує цілісність: якщо видалити клієнта, його замовлення теж зникнуть
 CREATE TABLE orders (
   id SERIAL PRIMARY KEY,
   customer_id INTEGER 
@@ -25,6 +26,7 @@ CREATE TABLE orders (
 );
 
 -- таблиця позицій у замовленні
+-- order_items реалізує зв’язок “багато‑до‑багатьох” між замовленнями та товарами
 CREATE TABLE order_items (
   order_id INTEGER 
   REFERENCES orders(id) ON DELETE CASCADE,
@@ -62,7 +64,7 @@ INSERT INTO order_items (order_id, product_id, quantity) VALUES
 (2, 3, 1), -- Iryna (2), T-Shirt, 1
 (3, 5, 2); -- Iryna (3), Water, 2
 
--- Реалізуйте CreateRiedUpdateDelete‑операції для таблиці products.
+-- Реалізуйте CreateReadUpdateDelete‑операції для таблиці products.
 
 -- CREATE: додати новий товар
 INSERT INTO products (name, category, price) VALUES ('Keyboard', 'Electronics', 15.00);
@@ -103,7 +105,29 @@ FROM products_new
 ORDER BY price DESC
 LIMIT 3;
 
-----
+-- ----------------------------
+-- Топ‑3 найдорожчі товари в кожній категорії
+-- Використовуємо віконну функцію ROW_NUMBER() для ранжування товарів у кожній категорії
+-- Потім вибираємо лише ті з них, які мають ранг 3 або менше
+-- 
+-- Внутрішній запит створює тимчасову таблицю з рангами товарів
+-- Зовнішній запит фільтрує ці дані
+-- 
+-- PARTITION BY category означає, що нумерація починається заново для кожної категорії
+-- ORDER BY price DESC визначає порядок нумерації (від найдорожчих до найдешевших)
+-- 
+-- Результат сортуємо за категорією і ціною у спадному порядку
+-- Таким чином отримуємо топ‑3 товари в кожній категорії
+-- Використання віконних функцій дозволяє ефективно виконувати складні аналітичні запити
+-- без необхідності складних підзапитів або тимчасових таблиць
+
+-- ----------------------------
+-- Частина в дужках (...) - це підзапит (subquery)
+-- Усередині нього ми створюємо додаткову колонку rank_in_category, яка нумерує товари всередині кожної категорії
+-- Щоб потім звертатися до результатів цього підзапиту, ми даємо йому ім’я - ranked
+-- Це ім’я працює як тимчасова таблиця: ми можемо писати SELECT ... FROM ranked, ніби це справжня таблиця
+-- -----------------------------------
+
 SELECT category, name, price
 FROM (
   SELECT category, name, price,
@@ -114,23 +138,33 @@ FROM (
 ) ranked
 WHERE rank_in_category <= 3
 ORDER BY category, price DESC;
----
+
 
 -- Використайте транзакцію для створення замовлення з кількома товарами.
 
+-- Транзакція гарантує, що всі операції будуть виконані разом
+-- або жодна з них не буде виконана (у разі помилки)
+-- Якщо щось піде не так - можна зробити ROLLBACK
+-- Починаємо транзакцію
 BEGIN;
+-- Створюємо нове замовлення для Taras (id=2)
 INSERT INTO orders (customer_id) VALUES (2); -- Taras
+-- Додаємо товари до цього замовлення
 INSERT INTO order_items (order_id, product_id, quantity)
 VALUES
 (4, 2, 3),
 (4, 5, 2),
 (4, 4, 1);
+-- Фіксуємо транзакцію
 COMMIT;
 
 -- Створіть view, яке показує кількість замовлень і витрати клієнтів.
+-- View дозволяє швидко отримати звіт без повторного написання складного запиту
+-- Використовуйте це view для отримання списку клієнтів, відсортованого за витратами
 
-CREATE VIEW customer_order_count_price AS (
-   SELECT c.name, 
+CREATE VIEW vw_customer_order_count_price AS (
+   SELECT c.id, 
+          c.name
           COUNT(o.id) AS orders_count,
           SUM(oi.quantity * p.price) AS order_total
    FROM customers c
