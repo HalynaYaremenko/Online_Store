@@ -164,8 +164,8 @@ COMMIT;
 
 CREATE VIEW vw_customer_order_count_price AS (
    SELECT c.id, 
-          c.name
-          COUNT(o.id) AS orders_count,
+          c.name,
+          COUNT(DISTINCT o.id) AS orders_count,
           SUM(oi.quantity * p.price) AS order_total
    FROM customers c
    JOIN orders o ON o.customer_id = c.id
